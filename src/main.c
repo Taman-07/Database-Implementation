@@ -1,16 +1,25 @@
 #include<stdio.h>
 #include<string.h>
+#include<unistd.h>
 #include "db_manager.h"
 
 int main()
 {
     char command[50];
+    char current_db[50]="";
 
     // if folder doesn't exists
     ensure_base_directories();
 
     while(1){
-        printf("Enter command: ");
+        printf("Enter command: \n");
+        if(strlen(current_db)==0){
+            printf("(no database)> ");
+        }
+        else{
+            printf("%s> ", current_db);
+        }
+        
         fgets(command, sizeof(command), stdin);
         
         size_t len=strlen(command);
@@ -30,7 +39,13 @@ int main()
 
         else if (strncmp(command, "USE ", 4) == 0) {
             const char *db_name = command + 4;
-            printf("Currently using , name = %s\n", db_name);
+            if(exists_database(db_name)){
+                strcpy(current_db,db_name);
+                printf("Currently using , name = %s\n", db_name);
+            }
+            else{
+                printf("Doesn't exists \n");
+            }
         }
 
         else{
