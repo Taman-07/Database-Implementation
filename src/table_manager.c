@@ -15,6 +15,7 @@ void create_table(const char *db_name, const char *rest_of_command){
         fprintf(stderr, "Error: could not parse table name.\n");
         return;
     }
+
     char db_dir[256];
     snprintf(db_dir, sizeof(db_dir), "data/databases/%s", db_name);
     mkdir(db_dir);
@@ -29,6 +30,16 @@ void create_table(const char *db_name, const char *rest_of_command){
         fprintf(stderr, "Error: could not create table file '%s'.\n", tbl_path);
         return;
     }
+
+    FILE *schema_file=fopen(schema_path, "w");
+    if(schema_file==NULL){
+        fprintf(stderr, "Error: could not create table file '%s'.\n", schema_path);
+        fclose(tbl_file);
+        return;
+    }
     fclose(tbl_file);
+    fclose(schema_file);
+
     printf("Table '%s' created. \n", table_name);
+    printf("Schema '%s' created. \n", table_name);
 }
