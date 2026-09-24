@@ -2,6 +2,7 @@
 #include<string.h>
 #include<unistd.h>
 #include "db_manager.h"
+#include "table_manager.h"
 
 int main()
 {
@@ -45,6 +46,16 @@ int main()
             }
             else{
                 printf("Doesn't exists \n");
+            }
+        }
+        
+        else if(strncmp(command, "CREATE TABLE ", 13)==0){
+            if(strlen(current_db)==0){
+                printf("No database selected first use 'USE' <name> command");
+            }
+            else{
+                const char *rest = command + 13;
+                create_table(current_db, rest);
             }
         }
 
