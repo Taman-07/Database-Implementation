@@ -52,23 +52,38 @@ void create_table(const char *db_name, const char *rest_of_command){
     FILE *schema_file=fopen(schema_path, "w");
     if(schema_file==NULL){
         fprintf(stderr, "Error: could not create table file '%s'.\n", schema_path);
-        fclose(tbl_file);
         return;
     }
 
     char *piece=strtok(schema_text, ",");
+    
     while(piece!=NULL){
         char col_name[64];
         char col_type[16];
-        if(sscanf(piece, "%63s %15s", col_name, col_type)!=2){
+        int chars_read=0;
+
+        if(sscanf(piece, "%63s %15s", col_name, col_type, &chars_read)!=2){
             fprintf(stderr, "Error: could not parse column '%s'.\n", piece);
             fclose(schema_file);
+            remove(schema_path);
+            remove(tbl_path);
+            return;
+        }
+
+        char leftover[64];
+        if(sscanf(piece+chars_read, "%63", leftover)!=1){
+            fprintf(stderr, "Error: unexpected extra text after column definition '%s'.\n", piece);
+            fclose(schema_file);
+            remove(schema_path);
+            remove(tbl_path);
             return;
         }
 
         if(strcmp(col_type, "INT")!=0 && strcmp(col_type, "TEXT")!=0){
             fprintf(stderr, "Error: invalid type '%s' for column '%s'. Only INT and TEXT allowed.\n", col_type, col_name);
             fclose(schema_file);
+            remove(schema_path);
+            remove(tbl_path);
             return;
         }
 
