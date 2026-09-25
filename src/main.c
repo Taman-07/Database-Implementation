@@ -6,7 +6,7 @@
 
 int main()
 {
-    char command[50];
+    char command[256];
     char current_db[50]="";
 
     // if folder doesn't exists
