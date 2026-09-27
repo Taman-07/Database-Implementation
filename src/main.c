@@ -58,6 +58,16 @@ int main()
                 create_table(current_db, rest);
             }
         }
+        
+        else if(strncmp(command, "INSERT INTO ", 12)==0){
+            if(strlen(current_db)==0){
+                printf("No database selected first use 'USE' <name> command\n");
+            }
+            else{
+                const char *rest = command + 12;
+                insert_into_table(current_db, rest);
+            }
+        }
 
         else{
             printf("Enter the valid command \n");
