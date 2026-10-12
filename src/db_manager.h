@@ -5,5 +5,6 @@
 void ensure_base_directories(void);
 void create_database(const char *name);
 bool exists_database(const char *name);
+bool drop_database(const char *name);
 
 #endif

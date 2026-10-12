@@ -49,6 +49,16 @@ int main()
             }
         }
         
+        else if(strncmp(command, "DROP DATABASE ", 14)==0){
+            const char *db_name=command+14;
+            if(drop_database(db_name)){             
+                if(strcmp(current_db, db_name)==0){
+                    current_db[0] = '\0';           
+                }
+            }
+        }
+
+
         else if(strncmp(command, "CREATE TABLE ", 13)==0){
             if(strlen(current_db)==0){
                 printf("No database selected first use 'USE' <name> command");
@@ -68,6 +78,27 @@ int main()
                 insert_into_table(current_db, rest);
             }
         }
+
+
+    //     else if(strncmp(command, "DROP TABLE ", 11)==0){
+    //         if(strlen(current_db)==0){
+    //             printf("No database selected first use 'USE' <name> command\n");
+    //         }
+    //         else{
+    //             drop_table(current_db, command + 11);
+    //         }
+    //     }
+        
+
+    //    else if(strncmp(command, "SELECT ", 7)==0){
+    //         if(strlen(current_db)==0){
+    //             printf("No database selected first use 'USE' <name> command\n");
+    //         }
+    //         else{
+    //             select_fromtable(current_db, command + 7); 
+    //         }
+    //     }
+
 
         else{
             printf("Enter the valid command \n");
