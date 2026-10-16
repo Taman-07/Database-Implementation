@@ -80,14 +80,14 @@ int main()
         }
 
 
-    //     else if(strncmp(command, "DROP TABLE ", 11)==0){
-    //         if(strlen(current_db)==0){
-    //             printf("No database selected first use 'USE' <name> command\n");
-    //         }
-    //         else{
-    //             drop_table(current_db, command + 11);
-    //         }
-    //     }
+        else if(strncmp(command, "DROP TABLE ", 11)==0){
+            if(strlen(current_db)==0){
+                printf("No database selected first use 'USE' <name> command\n");
+            }
+            else{
+                drop_table(current_db, command + 11);
+            }
+        }
         
 
     //    else if(strncmp(command, "SELECT ", 7)==0){

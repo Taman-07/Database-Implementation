@@ -272,3 +272,38 @@ void insert_into_table(const char *db_name, const char *rest_of_command){
     printf("1 row inserted into '%s'.\n", table_name);
 }
 
+
+int drop_table(const char *db_name, const char *table_name){
+    char name[64];
+    char tbl_path[300];
+    char schema_path[300];
+
+    strncpy(name, table_name, sizeof(name) - 1);
+    name[sizeof(name) - 1] = '\0';
+
+    size_t len = strlen(name);
+    while(len > 0 && (isspace((unsigned char)name[len-1]) || name[len-1] == ';')){
+        name[--len] = '\0';
+    }
+    if(len == 0){
+        fprintf(stderr, "Error: table name missing.\n");
+        return 0;
+    }
+
+    if(strchr(name, '/') || strchr(name, '\\') || strstr(name, "..")){
+        fprintf(stderr, "Error: invalid table name.\n");
+        return 0;
+    }
+
+    snprintf(tbl_path, sizeof(tbl_path), "data/databases/%s/%s.tbl", db_name, name);
+    snprintf(schema_path, sizeof(schema_path), "data/databases/%s/%s.schema", db_name, name);
+
+    if(remove(tbl_path) != 0){
+        fprintf(stderr, "Error: table '%s' does not exist.\n", name);
+        return 0;
+    }
+    remove(schema_path);  
+
+    printf("Table '%s' dropped.\n", name);
+    return 1;
+}
