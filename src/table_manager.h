@@ -9,6 +9,7 @@ typedef struct{
 void create_table(const char *db_name, const char *rest_of_command);
 void insert_into_table(const char *db_name, const char *rest_of_command);
 int drop_table(const char *db_name, const char *table_name);
+void select_fromtable(const char *db_name, const char *rest_of_command);
 
 #endif
 

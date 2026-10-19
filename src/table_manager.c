@@ -307,3 +307,226 @@ int drop_table(const char *db_name, const char *table_name){
     printf("Table '%s' dropped.\n", name);
     return 1;
 }
+
+static void skip_spaces(const char **p){
+    while(**p && isspace((unsigned char)**p)) (*p)++;
+}
+
+static int match_keyword(const char **p, const char *kw){
+    skip_spaces(p);
+    size_t n=strlen(kw);
+    for(size_t i=0;i<n;i++){
+        if(toupper((unsigned char) (*p)[i])!=kw[i]){
+            return 0;
+        }
+    }
+    char after=(*p)[n];
+    if(after != '\0' && !isspace((unsigned char) after) && after !=';'){
+        return 0;
+    }
+    *p+=n;
+    return 1;
+}
+
+
+static int row_matches(const char *cell, const char *type, const char *op, const char *val){
+    int cmp;
+    if(strcmp(type, "INT") == 0 || strcmp(type, "FLOAT") == 0){
+        double a = strtod(cell, NULL);
+        double b = strtod(val, NULL);
+        cmp = (a < b) ? -1 : (a > b) ? 1 : 0;
+    } else {
+        cmp = strcmp(cell, val);   // works for TEXT/STRING and ISO dates
+    }
+
+    if(strcmp(op, "=")  == 0) return cmp == 0;
+    if(strcmp(op, "!=") == 0 || strcmp(op, "<>") == 0) return cmp != 0;
+    if(strcmp(op, "<")  == 0) return cmp <  0;
+    if(strcmp(op, ">")  == 0) return cmp >  0;
+    if(strcmp(op, "<=") == 0) return cmp <= 0;
+    if(strcmp(op, ">=") == 0) return cmp >= 0;
+    return 0;
+}
+
+void select_fromtable(const char *db_name, const char *rest_of_command){
+    if(db_name == NULL || db_name[0] == '\0'){
+        fprintf(stderr, "Error: no database selected\n");
+        return;
+    }
+
+    const char *p = rest_of_command;
+
+    skip_spaces(&p);
+    if(*p != '*'){
+        fprintf(stderr, "Error: only SELECT * is supported.\n");
+        return;
+    }
+    p++;
+
+    if(!match_keyword(&p, "FROM")){
+        fprintf(stderr, "Error: expected FROM.\n");
+        return;
+    }
+
+    skip_spaces(&p);
+    char table_name[64];
+    int n = 0;
+    while(*p && !isspace((unsigned char)*p) && *p != ';' && n < 63){
+        table_name[n++] = *p++;
+    }
+    table_name[n] = '\0';
+    if(n == 0){
+        fprintf(stderr, "Error: table name missing.\n");
+        return;
+    }
+    if(strchr(table_name, '/') || strchr(table_name, '\\') || strstr(table_name, "..")){
+        fprintf(stderr, "Error: invalid table name.\n");
+        return;
+    }
+
+    int has_where = 0;
+    char where_col[64] = "";
+    char where_op[3] = "";
+    char where_val[64] = "";
+
+    if(match_keyword(&p, "WHERE")){
+        has_where = 1;
+
+        skip_spaces(&p);
+        n = 0;
+        while(*p && !isspace((unsigned char)*p) && !strchr("=!<>;", *p) && n < 63){
+            where_col[n++] = *p++;
+        }
+        where_col[n] = '\0';
+
+        skip_spaces(&p);
+        n = 0;
+        while(*p && strchr("=!<>", *p) && n < 2){
+            where_op[n++] = *p++;
+        }
+        where_op[n] = '\0';
+
+        if(where_col[0] == '\0' || where_op[0] == '\0'){
+            fprintf(stderr, "Error: WHERE must look like: WHERE column > value\n");
+            return;
+        }
+        if(strcmp(where_op, "=") && strcmp(where_op, "!=") && strcmp(where_op, "<>") &&
+           strcmp(where_op, "<") && strcmp(where_op, ">") &&
+           strcmp(where_op, "<=") && strcmp(where_op, ">=")){
+            fprintf(stderr, "Error: unknown operator '%s'.\n", where_op);
+            return;
+        }
+
+        skip_spaces(&p);
+        char raw[64];
+        strncpy(raw, p, sizeof(raw) - 1);
+        raw[sizeof(raw) - 1] = '\0';
+        size_t len = strlen(raw);
+        while(len > 0 && (isspace((unsigned char)raw[len-1]) || raw[len-1] == ';')) raw[--len] = '\0';
+
+        if(len == 0){
+            fprintf(stderr, "Error: WHERE value missing.\n");
+            return;
+        }
+        if(len >= 2 && raw[0] == '\'' && raw[len-1] == '\''){
+            raw[len-1] = '\0';
+            strcpy(where_val, raw + 1);
+        } else {
+            strcpy(where_val, raw);
+        }
+    }
+    else {
+        skip_spaces(&p);
+        if(*p == ';') p++;
+        skip_spaces(&p);
+        if(*p != '\0'){
+            fprintf(stderr, "Error: unexpected text '%s'.\n", p);
+            return;
+        }
+    }
+
+    char db_dir[256], tbl_path[300], schema_path[300];
+    snprintf(db_dir, sizeof(db_dir), "data/databases/%s", db_name);
+    snprintf(tbl_path, sizeof(tbl_path), "%s/%s.tbl", db_dir, table_name);
+    snprintf(schema_path, sizeof(schema_path), "%s/%s.schema", db_dir, table_name);
+
+    FILE *schema_file = fopen(schema_path, "r");
+    if(schema_file == NULL){
+        fprintf(stderr, "Error: table '%s' does not exist.\n", table_name);
+        return;
+    }
+
+    char col_names[32][64];
+    char col_types[32][16];
+    int col_count = 0;
+    char line[512];
+
+    while(col_count < 32 && fgets(line, sizeof(line), schema_file) != NULL){
+        if(sscanf(line, "%63s %15s", col_names[col_count], col_types[col_count]) == 2){
+            col_count++;
+        }
+    }
+    fclose(schema_file);
+
+    int where_idx = -1;
+    if(has_where){
+        for(int i = 0; i < col_count; i++){
+            if(strcmp(col_names[i], where_col) == 0){ where_idx = i; break; }
+        }
+        if(where_idx < 0){
+            fprintf(stderr, "Error: column '%s' does not exist in '%s'.\n", where_col, table_name);
+            return;
+        }
+        const char *t = col_types[where_idx];
+        if(strcmp(t, "INT") == 0 || strcmp(t, "FLOAT") == 0){
+            char *end;
+            strtod(where_val, &end);
+            if(*end != '\0' || where_val[0] == '\0'){
+                fprintf(stderr, "Error: '%s' is not a number for column '%s'.\n", where_val, where_col);
+                return;
+            }
+        }
+    }
+
+    FILE *tbl_file = fopen(tbl_path, "r");
+    if(tbl_file == NULL){
+        fprintf(stderr, "Error: could not open table file '%s'.\n", tbl_path);
+        return;
+    }
+
+    for(int i = 0; i < col_count; i++) printf("%-15s", col_names[i]);
+    printf("\n");
+    for(int i = 0; i < col_count * 15; i++) printf("-");
+    printf("\n");
+
+
+    int shown = 0;
+    while(fgets(line, sizeof(line), tbl_file) != NULL){
+        size_t len = strlen(line);
+        while(len > 0 && (line[len-1] == '\n' || line[len-1] == '\r')) line[--len] = '\0';
+        if(len == 0) continue;
+
+        char *fields[32];
+        int fc = 0;
+        char *tok = line;
+        while(fc < 32){
+            fields[fc++] = tok;
+            char *comma = strchr(tok, ',');
+            if(comma == NULL) break;
+            *comma = '\0';
+            tok = comma + 1;
+        }
+        if(fc != col_count) continue;  
+
+        if(has_where && !row_matches(fields[where_idx], col_types[where_idx], where_op, where_val)){
+            continue;
+        }
+
+        for(int i = 0; i < fc; i++) printf("%-15s", fields[i]);
+        printf("\n");
+        shown++;
+    }
+    fclose(tbl_file);
+    printf("(%d row%s)\n", shown, shown == 1 ? "" : "s");
+}
+

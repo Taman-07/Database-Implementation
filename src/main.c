@@ -90,18 +90,18 @@ int main()
         }
         
 
-    //    else if(strncmp(command, "SELECT ", 7)==0){
-    //         if(strlen(current_db)==0){
-    //             printf("No database selected first use 'USE' <name> command\n");
-    //         }
-    //         else{
-    //             select_fromtable(current_db, command + 7); 
-    //         }
-    //     }
-
+        else if(strncmp(command, "SELECT ", 7) == 0){
+            if(strlen(current_db) == 0){
+                printf("No database selected first use 'USE' <name> command\n");
+            }
+            else{
+                select_fromtable(current_db, command + 7);
+            }
+        }
 
         else{
             printf("Enter the valid command \n");
         }
     }   
 }
+
